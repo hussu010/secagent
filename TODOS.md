@@ -2,26 +2,6 @@
 
 ## Deferred (v2)
 
-### Bulletproof off-scope network gate (P2a hardening)
-- **What:** Abort every off-scope request (browser nav, redirect hop, subresource)
-  at the network layer, so the agent physically cannot reach a non-allowlisted host.
-- **Why:** Today's controls (per-action pre-check, `max_redirects=0` on the HTTP
-  tool, post-nav `page.url` check → `blocked_by_scope`) catch agent-chosen URLs and
-  detect redirect drift, but a *browser* auto-redirect fires one request to the
-  off-scope host before the post-check sees it. That single request is the residual
-  hole in the "no web tool" guarantee.
-- **Blocker:** Playwright's `context.route` (the obvious gate) puts the context into
-  request-interception mode, which downgrades off HTTP/2 globally and makes
-  PortSwigger return `ERR_HTTP2_PROTOCOL_ERROR` — even with a predicate matcher that
-  only targets off-scope URLs. So the gate breaks every lab.
-- **Options to explore:** a forward proxy with a host allowlist (launch Chromium with
-  `--proxy-server` pointing at a tiny local allowlisting proxy — keeps HTTP/2 to the
-  lab, blocks everything else); or CDP `Fetch.enable` with surgical scope; or accept
-  the residual for deliberately-vulnerable lab targets only.
-- **Severity:** low for the current target set (labs we launch are not hostile
-  redirectors); raise priority before pointing the hunter at anything less trusted.
-- **Source:** Codex pre-merge review #1/#2, 2026-06-20 (ship).
-
 ### Value-sensitive endpoint signatures
 - **What:** Optionally distinguish endpoints by a value-derived operation class
   (e.g. search-text present, coupon code, injection-shaped payload) instead of
