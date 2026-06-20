@@ -1,7 +1,7 @@
 [project]
 name = "secagent"
-version = "0.1.0"
-description = "Black-box web recon companion (v1: attack-surface mapper for OWASP Juice Shop)"
+version = "0.2.0"
+description = "Black-box web security agent (v1: attack-surface mapper; v2: autonomous hunter for PortSwigger labs)"
 requires-python = ">=3.13"
 dependencies = [
     "playwright==1.60.0",
@@ -13,11 +13,18 @@ secagent = "secagent.cli:main"
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",
+    "langgraph>=0.2",   # tests drive the real (sync) hunt graph with fakes
 ]
-# LLM page-understanding (T5). Optional: the package imports and the capture
-# pipeline runs without it; only `secagent annotate` needs it + ANTHROPIC_API_KEY.
+# LLM page-understanding (annotate) + the v2 hunter's reasoning. Optional: the
+# package imports and the v1 capture pipeline run without it; only `secagent
+# annotate` and `secagent hunt` need it + ANTHROPIC_API_KEY.
 llm = [
     "anthropic>=0.40",
+]
+# v2 hunter orchestration (sync LangGraph state machine). Needed by `secagent
+# hunt`; the rest of the package imports without it.
+agent = [
+    "langgraph>=0.2",
 ]
 
 [tool.pytest.ini_options]
