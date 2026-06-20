@@ -1,0 +1,13 @@
+# OWASP Juice Shop — the deliberately-vulnerable target the recon tool maps.
+# Pinned by digest for reproducible runs (this digest is v20.0.0).
+#
+#   docker compose up -d        # start the target
+#   docker compose down         # stop it
+#
+services:
+  juiceshop:
+    image: bkimminich/juice-shop@sha256:25fd268112350ae9e0ddc7878371f9f12f5b0b546c7bf934d6599aa8e724418f
+    container_name: juiceshop
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

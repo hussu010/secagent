@@ -1,3 +1,9 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+*.egg-info/
+
+# generated recon output — regenerate by running the tool
+*.db
+recon.html
