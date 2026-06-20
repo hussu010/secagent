@@ -1,9 +1,13 @@
 """
-Report / inspection view (T8).
+Report / inspection view (v1 recon map + v2 hunt runs).
 
-Renders the attack-surface map from the store as text (and optional HTML). This
-is *inspection*, not observability — a readable dump of endpoints, pages, and
-their links, so a human can eyeball what the recon run found.
+Renders the attack-surface map AND, for v2, the hunt trace (one run = one lab
+hunt; its steps are the hypothesize/act/observe/score timeline + terminal status).
+This is *inspection*, not observability — a readable dump so a human can eyeball
+what recon found and exactly how a hunt unfolded.
+
+    store ──┬─ endpoints/pages ──▶ attack-surface map (v1)
+            └─ runs/steps      ──▶ hunt timeline + verdict (v2)
 """
 
 from __future__ import annotations
@@ -60,13 +64,63 @@ def render_html(store: Store) -> str:
     )
 
 
+def _short(text: str | None, n: int = 70) -> str:
+    if not text:
+        return ""
+    text = text.replace("\n", " ")
+    return text if len(text) <= n else text[: n - 1] + "…"
+
+
+def render_runs_text(store: Store) -> str:
+    """Hunt trace: each run's verdict + its hypothesize/act/score timeline."""
+    runs = store.runs()
+    if not runs:
+        return ""
+    lines = ["", "=== HUNT RUNS ===", ""]
+    for r in runs:
+        status = r["status"] or "in-progress"
+        lines.append(f"RUN {r['id']}  [{status}]  {r['lab_id']}  goal: {_short(r['goal'])}")
+        if r["note"]:
+            lines.append(f"    note: {_short(r['note'])}")
+        for s in store.steps(r["id"]):
+            detail = s["score"] or _short(s["action"] or s["observation"], 60)
+            lines.append(f"    #{s['idx']:<3} {s['node']:<11} {detail}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def render_runs_html(store: Store) -> str:
+    runs = store.runs()
+    if not runs:
+        return ""
+    blocks = ["<h1>Hunt runs</h1>"]
+    for r in runs:
+        status = r["status"] or "in-progress"
+        rows = "\n".join(
+            f"<tr><td>{s['idx']}</td><td>{s['node']}</td>"
+            f"<td><code>{html.escape(s['score'] or s['action'] or s['observation'] or '')}</code></td></tr>"
+            for s in store.steps(r["id"])
+        )
+        blocks.append(
+            f"<h2>Run {r['id']} — <span>{html.escape(status)}</span></h2>"
+            f"<p>{html.escape(r['lab_id'])} · goal: {html.escape(r['goal'])}"
+            + (f" · note: {html.escape(r['note'])}" if r["note"] else "")
+            + "</p>"
+            f"<table><tr><th>#</th><th>node</th><th>detail</th></tr>{rows}</table>"
+        )
+    return "".join(blocks)
+
+
 def render(db_path: str, html_path: str | None = None) -> None:
     store = Store(db_path)
     try:
         print(render_text(store))
+        runs_text = render_runs_text(store)
+        if runs_text:
+            print(runs_text)
         if html_path:
             with open(html_path, "w") as f:
-                f.write(render_html(store))
+                f.write(render_html(store) + render_runs_html(store))
             print(f"(html written to {html_path})")
     finally:
         store.close()
