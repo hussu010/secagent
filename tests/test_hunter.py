@@ -188,10 +188,16 @@ def test_rate_limited(store):
     assert final["status"] == RATE_LIMITED
 
 
-def test_forbidden_is_rate_limited(store):
+def test_forbidden_is_not_terminal(store):
+    # 403 is a normal payload rejection in hunting — the agent must keep going,
+    # not abort. The run ends on budget, not rate_limited.
     llm = FakeLLM([{"tool": "http", "method": "GET", "url": LAB + "/x"}])
-    final = _run(store, llm, FakeSession(status=403), _scorer(NOT_SOLVED))
-    assert final["status"] == RATE_LIMITED
+    final = _run(store, llm, FakeSession(status=403), _scorer(NOT_SOLVED), max_steps=3)
+    assert final["status"] == BUDGET_EXHAUSTED
+    assert final["status"] != RATE_LIMITED
+    # the 403 observation is recorded so the model can adapt to it
+    acts = [s for s in store.steps(1) if s["node"] == "act"]
+    assert any('"status": 403' in (a["observation"] or "") for a in acts)
 
 
 @pytest.mark.parametrize("code", [502, 503, 504])

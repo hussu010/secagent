@@ -264,11 +264,13 @@ def build_hunt_graph(deps: HuntDeps):
             _rec("act", action=json.dumps(action), observation=f"tool_error: {e}")
             return state
         obs_d = obs.as_dict()
-        # 429/403 → stop (R6); 401 → auth lost, NO re-login (T2); 5xx → lab is down
-        # (expired/restarting), don't burn the budget flailing (R9 lifecycle).
-        if obs.status in (429, 403):
+        # 429 → genuine rate limiting, stop + back off (R6). 403 is NOT terminal:
+        # in hunting a 403 is usually the app/WAF rejecting a payload, exactly the
+        # signal the agent should adapt to — aborting on it kills the hunt. 401 →
+        # auth lost, NO re-login (T2). 5xx → lab is down, don't flail (R9).
+        if obs.status == 429:
             state["status"] = RATE_LIMITED
-            state["note"] = f"target returned {obs.status}"
+            state["note"] = "target returned 429 (rate limited)"
         elif obs.status == 401:
             state["status"] = AUTH_EXPIRED
             state["note"] = "401 mid-run; no silent re-login"
