@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lab</title>
+  <script>
+    // Decoy: the word "Solved" appears here, in nav, and in aria labels. A naive
+    // substring scorer would wrongly report this not-solved lab as solved.
+    var labStates = ["Not solved", "Solved"];
+  </script>
+</head>
+<body>
+  <nav aria-label="Solved labs">…</nav>
+  <div id="academyLabHeader">
+    <section class="academyLabBanner">
+      <div class="container">
+        <div class="title-container">
+          <h2>SQL injection vulnerability allowing login bypass</h2>
+        </div>
+        <div class="widgetcontainer-lab-status is-notsolved">
+          <span>LAB</span>
+          <p>Not solved</p>
+        </div>
+      </div>
+    </section>
+  </div>
+  <main>store content here</main>
+</body>
+</html>
