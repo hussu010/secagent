@@ -73,6 +73,37 @@ same path tests exercise from recorded fixtures, so capture is tested with no br
 
 Run the tests: `.venv/bin/python -m pytest`.
 
+## v2 — autonomous hunter (Phase 1, new)
+
+Given **only** a live lab instance URL and a goal (no vuln-class hint), an agent tries to
+find and exploit the bug, self-scoring against the lab's solve banner. The point is
+**measuring** AI hunting capability, not a product — see the design doc in
+`~/.gstack/projects/secagent/` for the full rationale (per-instance randomization, the
+goal-only stance, and why Phase 1 is direct-agent).
+
+```
+# install the hunter deps (LangGraph orchestration + Anthropic SDK)
+uv pip install --python .venv/bin/python -e '.[agent,llm]'
+cp .env.example .env && $EDITOR .env     # put ANTHROPIC_API_KEY here (gitignored)
+
+# hunt one PortSwigger lab from goal-only (the lab host is allowlisted by suffix)
+.venv/bin/secagent hunt https://<id>.web-security-academy.net \
+    --goal "Log in as the administrator user" \
+    --lab-id sqli-login-bypass --db hunt.db
+
+# inspect the trace (verdict + hypothesize/act/observe/score timeline)
+.venv/bin/secagent report --db hunt.db --html hunt.html
+```
+
+Safety: the host allowlist is enforced on **every** agent action (and redirect hop), so the
+agent physically cannot reach a host outside the lab. `*.web-security-academy.net` is allowed
+by suffix; everything else is refused unless you pass `--allow-host` / `--allow-suffix`.
+
+Design (Phase 1, locked): sync LangGraph + sync Playwright · direct-agent (no pre-fed recon
+map, to keep the goal-only measurement honest) · isolated banner scorer · 10 explicit terminal
+statuses · crash-safe runs/steps trace with a per-step input record (proves no lab metadata
+leaked to the model). The canary + observed-vs-recalled tagging are Phase 2.
+
 ## v0 — proof of concept (kept for reference)
 
 The original ~50-line capture-and-print script:
