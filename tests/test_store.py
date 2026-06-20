@@ -2,6 +2,7 @@
 
 import pytest
 
+from secagent.status import BUDGET_EXHAUSTED, SOLVED, TOOL_ERROR
 from secagent.store import Store, page_key
 
 
@@ -148,3 +149,87 @@ def test_link_is_idempotent(store):
     store.link(pid, eid)
     store.link(pid, eid)
     assert len(store.endpoints_for_page(pid)) == 1
+
+
+# ============================================================ hunt trace (v2)
+def _run(store, **over):
+    base = dict(lab_id="sqli-login-bypass", base_url="https://x.web-security-academy.net", goal="Log in as administrator")
+    base.update(over)
+    return store.start_run(**base)
+
+
+def test_start_run_is_in_progress(store):
+    rid = _run(store)
+    row = store.run(rid)
+    assert row["status"] is None  # in-progress until finished
+    assert row["ended_at"] is None
+    assert row["goal"] == "Log in as administrator"
+
+
+def test_record_and_read_steps_in_order(store):
+    rid = _run(store)
+    store.record_step(rid, 0, "hypothesize", input_bundle="goal only", observation="hyp: try SQLi")
+    store.record_step(rid, 1, "act", action='{"tool":"http.request"}')
+    store.record_step(rid, 2, "score", score="not_solved")
+    steps = store.steps(rid)
+    assert [s["idx"] for s in steps] == [0, 1, 2]
+    assert steps[0]["input_bundle"] == "goal only"
+    assert steps[2]["score"] == "not_solved"
+
+
+def test_record_step_is_idempotent_on_run_idx(store):
+    rid = _run(store)
+    store.record_step(rid, 0, "act", action="v1")
+    store.record_step(rid, 0, "act", action="v2")  # same (run, idx) → update, not dup
+    steps = store.steps(rid)
+    assert len(steps) == 1
+    assert steps[0]["action"] == "v2"
+
+
+def test_finish_run_sets_terminal_status(store):
+    rid = _run(store)
+    store.finish_run(rid, SOLVED)
+    row = store.run(rid)
+    assert row["status"] == SOLVED
+    assert row["ended_at"] is not None
+
+
+def test_finish_run_rejects_unknown_status(store):
+    rid = _run(store)
+    with pytest.raises(ValueError):
+        store.finish_run(rid, "totally_made_up")
+
+
+def test_finalize_unfinished_recovers_crashed_runs(store):
+    crashed = _run(store)              # never finished → simulates a killed process
+    done = _run(store)
+    store.finish_run(done, SOLVED)
+    n = store.finalize_unfinished(TOOL_ERROR)
+    assert n == 1                       # only the crashed one
+    assert store.run(crashed)["status"] == TOOL_ERROR
+    assert store.run(done)["status"] == SOLVED  # untouched
+
+
+def test_finalize_unfinished_rejects_unknown_status(store):
+    _run(store)
+    with pytest.raises(ValueError):
+        store.finalize_unfinished("nope")
+
+
+def test_touch_run_updates_last_seen(store):
+    rid = _run(store, launched_at="2026-06-20T00:00:00Z")
+    store.touch_run(rid, now="2026-06-20T00:05:00Z")
+    assert store.run(rid)["last_seen"] == "2026-06-20T00:05:00Z"
+
+
+def test_runs_listing(store):
+    _run(store, lab_id="a")
+    _run(store, lab_id="b")
+    assert [r["lab_id"] for r in store.runs()] == ["a", "b"]
+
+
+def test_budget_exhausted_is_a_valid_terminal(store):
+    rid = _run(store)
+    store.finish_run(rid, BUDGET_EXHAUSTED, note="hit step cap")
+    assert store.run(rid)["status"] == BUDGET_EXHAUSTED
+    assert store.run(rid)["note"] == "hit step cap"
