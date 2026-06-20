@@ -1,0 +1,25 @@
+[project]
+name = "secagent"
+version = "0.1.0"
+description = "Black-box web recon companion (v1: attack-surface mapper for OWASP Juice Shop)"
+requires-python = ">=3.13"
+dependencies = [
+    "playwright==1.60.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+]
+# LLM page-understanding (T5). Optional: the package imports and the capture
+# pipeline runs without it; only `secagent annotate` needs it + ANTHROPIC_API_KEY.
+llm = [
+    "anthropic>=0.40",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+include = ["secagent*"]
